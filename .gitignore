@@ -1,0 +1,29 @@
+# Freebuff for Termux — build output
+dist/
+out/
+*.deb
+*.sha256
+SHA256SUMS
+BUILD-SHA256SUMS
+BUILD-INFO.txt
+
+# The upstream checkout ci/prepare-build-tree.sh creates
+build/
+/tmp/
+.termux-upstream-commit
+
+# Never commit a Termux or Bun configuration that points at a local machine
+.env
+.env.local
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Editors must not add these to shell scripts that run on a phone
+*.orig
+*.rej

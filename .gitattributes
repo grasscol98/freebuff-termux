@@ -1,0 +1,20 @@
+# LF, always.
+#
+# These scripts run on Android through Termux, where a CRLF line ending turns the
+# shebang into `#!/data/.../bash\r` and every invocation fails with "not found" --
+# an error that has nothing to do with permissions and wastes an afternoon.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+freebuff text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+LICENSE text eol=lf
+
+# Nothing in this repository is a binary, but be explicit in case a fixture lands.
+*.deb  binary
+*.so   binary
+*.wasm binary
+*.png  binary

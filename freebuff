@@ -1,0 +1,136 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# freebuff-termux runtime wrapper
+#
+# Installed as $PREFIX/bin/freebuff by the .deb. The compiled binary is a
+# genuine Bionic executable built with a patched Bun runtime (bd-loser/bun-termux)
+# against the @androidtui OpenTUI build, so unlike a stock Freebuff release it
+# runs on Android with no glibc userland and no proot.
+#
+# This wrapper exists for the environment the binary cannot discover for itself.
+# It always ends in `exec`, so the TUI owns the terminal directly: Ctrl-C,
+# SIGTERM, exit codes and job control behave as if the binary were started by
+# hand.
+#
+#   License: Apache-2.0.  See CREDITS.md.
+
+set -u
+
+CONFIG_DIR="${FREEBUFF_TERMUX_CONFIG_DIR:-${HOME}/.config/manicode}"
+
+die() {
+	printf 'freebuff: %s\n' "$1" >&2
+	printf 'Run `freebuff --diagnose` for a full report.\n' >&2
+	exit 1
+}
+
+# Resolve the real binary. The .deb installs the wrapper as bin/freebuff and the
+# compiled executable under libexec/, so the two must not be confused.
+# FREEBUFF_TERMUX_BINARY lets a developer build elsewhere be run without a
+# reinstall.
+PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
+BINARY="${FREEBUFF_TERMUX_BINARY:-}"
+if [ -z "${BINARY}" ]; then
+	for candidate in "${PREFIX_DIR}/libexec/freebuff/freebuff" \
+	                "${CONFIG_DIR}/freebuff"; do
+		if [ -f "${candidate}" ]; then
+			BINARY="${candidate}"
+			break
+		fi
+	done
+fi
+[ -n "${BINARY}" ] && [ -f "${BINARY}" ] || die \
+	"cannot locate the freebuff binary. Reinstall with: curl -fsSL <install-url> | bash"
+
+# --- diagnostics mode -------------------------------------------------------
+
+if [ "${1:-}" = "--diagnose" ]; then
+	DIAGNOSE="${FREEBUFF_TERMUX_DIAGNOSE:-}"
+	if [ -z "${DIAGNOSE}" ] && command -v freebuff-diagnose >/dev/null 2>&1; then
+		DIAGNOSE="$(command -v freebuff-diagnose)"
+	fi
+	[ -n "${DIAGNOSE}" ] && [ -x "${DIAGNOSE}" ] && exec "${DIAGNOSE}"
+	die "diagnostics script not found; expected freebuff-diagnose on PATH."
+fi
+
+# --- executability ----------------------------------------------------------
+
+if [ ! -x "${BINARY}" ]; then
+	# Android's execve enforces the no-exec bit rather than the filesystem's, and
+	# refuses /sdcard and every other shared-storage mount outright.
+	chmod +x "${BINARY}" 2>/dev/null || die \
+		"${BINARY} is not executable and chmod failed. It must live in \$HOME or \$PREFIX — Android cannot execute from shared storage."
+fi
+
+# --- tree-sitter.wasm -------------------------------------------------------
+#
+# The CLI reads it from the directory next to the binary at startup. The .deb
+# installs it to $PREFIX/share/freebuff; symlink rather than copy so an upgrade
+# cannot leave a stale one behind.
+WASM_DIR="$(dirname "${BINARY}")"
+if [ ! -f "${WASM_DIR}/tree-sitter.wasm" ]; then
+	for candidate in "${PREFIX:-/data/data/com.termux/files/usr}/share/freebuff/tree-sitter.wasm" \
+	                "${CONFIG_DIR}/tree-sitter.wasm"; do
+		if [ -f "${candidate}" ]; then
+			ln -sf "${candidate}" "${WASM_DIR}/tree-sitter.wasm" 2>/dev/null || cp -f "${candidate}" "${WASM_DIR}/tree-sitter.wasm"
+			break
+		fi
+	done
+fi
+[ -f "${WASM_DIR}/tree-sitter.wasm" ] || printf \
+	'freebuff: warning: tree-sitter.wasm not found; syntax highlighting may fail.\n' >&2
+
+# --- disposable TMPDIR, and sweep the per-launch native library -------------
+#
+# Each launch unpacks the embedded OpenTUI .so to a fresh TMPDIR file and never
+# deletes it — one ~10 MB file per launch, named uniquely so nothing is reused.
+# Upstream issue (still open as of this writing):
+#   https://github.com/CodebuffAI/freebuff/issues/1443
+#
+# On Termux the default TMPDIR is $PREFIX/tmp, on internal storage, so a few
+# dozen launches a day is real gigabytes. The file is safe to remove once the
+# process has mapped it, so the sweep runs before exec rather than from a trap:
+# the TUI exits the shell on its own signals and a trap would never fire.
+#
+# Note this only mitigates. The unlink belongs upstream, in the CLI.
+
+SCRATCH="${FREEBUFF_TERMUX_TMPDIR:-${TMPDIR:-${PREFIX:-/data/data/com.termux/files/usr}/tmp}}"
+if mkdir -p "${SCRATCH}" 2>/dev/null; then
+	export TMPDIR="${SCRATCH}"
+	# -mmin +1 skips a library another live session may still be starting up.
+	find "${SCRATCH}" -maxdepth 1 -name '.*.so' -type f -mmin +1 -delete 2>/dev/null || true
+fi
+
+# --- CA certificates --------------------------------------------------------
+#
+# Bun ships its own root store, which works. Termux's CA bundle is still worth
+# adding because a corporate or regional proxy is a common reason for a phone to
+# reach codebuff.com over a trusted-but-private CA, and Bun honours
+# NODE_EXTRA_CA_CERTS on top of its built-ins.
+CA_BUNDLE="${PREFIX:-/data/data/com.termux/files/usr}/etc/tls/certs/ca-certificates.crt"
+if [ -z "${NODE_EXTRA_CA_CERTS:-}" ] && [ -r "${CA_BUNDLE}" ]; then
+	export NODE_EXTRA_CA_CERTS="${CA_BUNDLE}"
+fi
+
+# --- ripgrep ----------------------------------------------------------------
+#
+# The CLI self-extracts an embedded glibc `rg` next to itself and spawns it. That
+# binary cannot run on Bionic, and CODEBUFF_RG_PATH — the supported override —
+# is only read on the CLI's failure path upstream, so the `ripgrep: honour
+# CODEBUFF_RG_PATH in compiled mode` edit in ci/apply-patches.mjs is part of this
+# build. Point it at Termux's own ripgrep.
+#
+# Only set it when rg actually resolves: a path that does not exist is worse
+# than leaving the variable unset, because the CLI would not fall back.
+if [ -z "${CODEBUFF_RG_PATH:-}" ] && command -v rg >/dev/null 2>&1; then
+	CODEBUFF_RG_PATH="$(command -v rg)"
+	export CODEBUFF_RG_PATH
+fi
+
+# The CLI spawns a shell for terminal commands. Termux has no /system/bin/sh in
+# the expected place, so hand it the Termux shell explicitly.
+if [ -z "${SHELL:-}" ] && [ -x "${PREFIX:-/data/data/com.termux/files/usr}/bin/bash" ]; then
+	export SHELL="${PREFIX}/bin/bash"
+fi
+
+exec "${BINARY}" "$@"
