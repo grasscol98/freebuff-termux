@@ -1,0 +1,37 @@
+{
+  "_comment": [
+    "Pins for the Termux build. Everything here is a deliberate, reviewable",
+    "decision: bump one at a time and rebuild.",
+    "",
+    "freebuff.ref is a git ref in the upstream repository. Pin a commit sha",
+    "rather than a branch for reproducible releases -- a branch moves, and an",
+    "OpenTUI API change upstream can break the build days later with no change",
+    "on this side."
+  ],
+  "freebuff": {
+    "ref": "main",
+    "version": "0.0.0-termux-ci"
+  },
+  "opentui": {
+    "_comment": [
+      "Must match the version Freebuff's cli/package.json pins after",
+      "ci/apply-config-delta.mjs runs; the CLI's build script asserts they are",
+      "equal. Published as @androidtui/* on npm."
+    ],
+    "core": "0.5.14",
+    "react": "0.5.14",
+    "androidArm64Native": "0.5.14"
+  },
+  "bunTermux": {
+    "_comment": [
+      "Patched Bun that runs under Bionic. This is NOT stock Bun: upstream has",
+      "no Android build that works as-is (seccomp traps on fchmodat2/openat2,",
+      "no FFI JIT path). Pin an exact version -- never /latest, because a",
+      "regressed build reaching users is far worse than a missing one.",
+      "See CREDITS.md."
+    ],
+    "version": "1.4.2-patched",
+    "installUrl": "https://raw.githubusercontent.com/bd-loser/bun-termux/main/scripts/install.sh",
+    "debUrlTemplate": "https://github.com/bd-loser/bun-termux/releases/download/v{version}/bun_{version}_aarch64.deb"
+  }
+}

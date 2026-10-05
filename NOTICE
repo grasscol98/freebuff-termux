@@ -1,0 +1,62 @@
+# NOTICE
+
+Freebuff for Termux
+
+This product is a build of, and a set of build instructions for, software that
+other people wrote.
+
+Freebuff
+  Copyright the Freebuff contributors
+  https://github.com/CodebuffAI/freebuff
+  Licensed under the Apache License, Version 2.0
+
+  The Freebuff CLI source is used unmodified apart from one small patch, applied
+  by ci/apply-patches.mjs and described in docs/PORTING-NOTES.md. That patch is
+  written to be contributed upstream. No Freebuff source is redistributed in this
+  repository; Releases contain a compiled binary built from the upstream source.
+
+bun-termux
+  Copyright the bun-termux contributors
+  https://github.com/bd-loser/bun-termux
+
+  A prebuilt, patched Bun runtime for Android/Bionic. Releases contain a binary
+  produced from that project's source; no source is vendored here.
+
+@androidtui/*
+  Copyright the androidtui and OpenTUI contributors
+  https://github.com/bd-loser/opentui
+  https://github.com/anomalyco/opentui
+
+  OpenTUI's terminal-UI native library, rebuilt for android-arm64 (Bionic ABI,
+  16 KiB page-size aligned), plus the JavaScript packages that route to it.
+
+opencode-bionic
+  Copyright the opencode-bionic contributors
+  https://github.com/bd-loser/opencode-bionic
+  Licensed under the MIT License
+
+  Referenced for the approach to porting a Bun/OpenTUI-based coding agent to
+  Android. No code is copied from it, but the design and several build details
+  originated there. See CREDITS.md.
+
+OpenCode itself (anomalyco/opencode) is not included here and is not required to
+build Freebuff.
+
+Bun
+  Copyright the Bun contributors
+  https://github.com/oven-sh/bun
+  Licensed under the MIT License
+
+Termux
+  Copyright the Termux contributors
+  https://github.com/termux/termux-app
+  Licensed under the GNU General Public License, Version 3
+
+  Not included or modified. This product targets Termux and packages according to
+  its conventions.
+
+This repository's own contributions — the configuration delta, the patch set, the
+wrapper, the installer, the diagnostics and the CI — are licensed under the
+Apache License, Version 2.0; see LICENSE.
+
+Full attribution and the reasoning behind the reuse: CREDITS.md.
